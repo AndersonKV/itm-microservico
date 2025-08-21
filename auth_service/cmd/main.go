@@ -1,32 +1,49 @@
+// main.go
 package main
 
 import (
-	"log"
-
-	"github.com/AndersonKV/auth_service/internal/auth"
-	"github.com/AndersonKV/auth_service/internal/db"
+	"github.com/AndersonKV/instagram-microservice/internal/controller"
+	"github.com/AndersonKV/instagram-microservice/internal/db"
+	authHandler "github.com/AndersonKV/instagram-microservice/internal/handler/auth"
+	userHandler "github.com/AndersonKV/instagram-microservice/internal/handler/user"
+	authRepo "github.com/AndersonKV/instagram-microservice/internal/repository/auth"
+	"github.com/AndersonKV/instagram-microservice/internal/repository/user"
+	"github.com/AndersonKV/instagram-microservice/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
-
 func main() {
-    // Conectar ao Oracle
-    oracleDB, err := db.ConnectOracle("usuario", "senha", "localhost", "1521", "XE")
-    if err != nil {
-        log.Fatal(err)
-    }
+	database := db.InitDB()
 
-    // Criar repositório e serviço
-    repo := auth.NewAuthRepository(oracleDB)
-    service := auth.NewAuthService(repo)
+	// ✅ Cadeia completa de dependências
+	userRepo := user.NewUserRepository(database)
 
-    // Inicializar Gin
-    r := gin.Default()
+	// User flow
+	userService := service.NewUserService(userRepo)
+	userController := controller.NewUserController(userService)
+	userHandler := userHandler.NewUserHandler(userController) // ✅ Agora tipos compatíveis
 
-    // Rotas do Auth
-    r.POST("/register", auth.RegisterHandler(service))
-    r.POST("/login", auth.LoginHandler(service))
+	// Auth flow
+	authService := authRepo.NewAuthService(userRepo)
+	authHandler := authHandler.NewAuthHandler(authService)
 
-    // Rodar servidor
-    r.Run(":8081") // porta do Auth Service
+	// Rotas
+	r := gin.Default()
+
+	api := r.Group("/api/v1")
+	{
+		authRoutes := api.Group("/auth")
+		{
+			authRoutes.POST("/login", authHandler.Login)
+		}
+
+		userRoutes := api.Group("/users")
+		{
+			userRoutes.POST("/create", userHandler.Create)
+			userRoutes.GET("/:id", userHandler.FindById)
+			userRoutes.DELETE("/:id", userHandler.Delete)
+		}
+	}
+
+	r.Run(":8080")
 }

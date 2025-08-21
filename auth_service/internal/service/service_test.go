@@ -1,10 +1,10 @@
-package auth
+package service
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/AndersonKV/auth_service/internal/models"
+	"github.com/AndersonKV/instagram-microservice/internal/auth/models"
 )
 
 // ==========================
@@ -42,15 +42,37 @@ func (m *MockRepository) GetUserByEmail(email string) (models.User, error) {
     return user, nil
 }
 
+// GetUserByEmail simula busca de usuário por email
+func (m *MockRepository) FindByEmail(email string) (*models.User, error) {
+    user, exists := m.users[email]
+    if !exists {
+        return nil, nil // não encontrou
+    }
+    return &user, nil
+}
+
+
+
+func (m *MockRepository) FindByUsername(username string) (*models.User, error) {
+    for _, user := range m.users {
+        if user.Username == username {
+            return &user, nil
+        }
+    }
+    return nil, nil
+}
+
+ 
+
 // ==========================
 // Testes
 // ==========================
 
 func TestRegisterUser_Success(t *testing.T) {
-repo := NewMockRepository()
-service := NewAuthService(repo)  
+    repo := NewMockRepository()
+    service := NewAuthService(repo)  
 
-    err := service.Register("user1", "user1@email.com", "senha123", "foto.png" )
+    err := service.Register("nome", "user1", "user1@email.com", "senha123")
     if err != nil {
         t.Errorf("Esperava nil, recebeu: %v", err)
     }
@@ -61,10 +83,10 @@ func TestRegisterUser_DuplicateEmail(t *testing.T) {
     service := NewAuthService(repo)
 
     // Primeiro registro
-    _ = service.Register("user1", "user1@email.com", "senha123", "foto.png" )
+    _ = service.Register("username","name", "user1@email.com", "senha123")
     
     // Segundo registro com mesmo email
-    err := service.Register("user2", "user1@email.com", "senha456", "foto2.png" )
+    err := service.Register("username","name", "user1@email.com", "senha456")
     if err == nil {
         t.Errorf("Esperava erro de usuário duplicado, recebeu nil")
     }
@@ -75,7 +97,7 @@ func TestLoginUser_Success(t *testing.T) {
     service := NewAuthService(repo)
 
     // Registrar usuário
-    _ = service.Register("user1", "user1@email.com", "senha123", "foto.png")
+    _ = service.Register("name", "user1", "user1@email.com", "senha123" )
 
     token, err := service.Login("user1@email.com", "senha123")
     if err != nil {
@@ -90,7 +112,7 @@ func TestLoginUser_WrongPassword(t *testing.T) {
     repo := NewMockRepository()
     service := NewAuthService(repo)
 
-    _ = service.Register("user1", "user1@email.com", "senha123", "foto.png" )
+    _ = service.Register("name", "user1", "user1@email.com", "senha123")
 
     _, err := service.Login("user1@email.com", "senhaErrada")
     if err == nil {
